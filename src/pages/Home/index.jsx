@@ -64,7 +64,14 @@ export const Home = () => {
         </Title>
         <Space>
           {isAuthenticated && (
-            <Button onClick={() => navigate("/doador")}>Tela do doador</Button>
+            <>
+              <Button onClick={() => navigate("/doador")}>
+                Tela do doador
+              </Button>
+              <Button onClick={() => navigate("/recebedor")}>
+                Tela do recebedor
+              </Button>
+            </>
           )}
           {isAuthenticated ? (
             <Button type="primary" danger onClick={handleSignOut}>

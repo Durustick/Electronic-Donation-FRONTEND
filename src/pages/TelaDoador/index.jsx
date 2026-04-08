@@ -1,7 +1,7 @@
 // import { Header } from "../../components/Header";
 // import { Footer } from "../../components/Footer";
-import { Container, Content } from "./styles";
-import { useState } from "react";
+import { ButtonsContainer, Container, Content } from "./styles";
+import { useEffect, useState } from "react";
 import { useAuth } from "../../hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import {
@@ -28,30 +28,10 @@ const { Title, Paragraph } = Typography;
 const { Dragger } = Upload;
 const { Header } = Layout;
 
-const mockDonations = [
-  {
-    id: 1,
-    name: "Notebook Dell",
-    status: "Disponível",
-    imageUrl: "https://via.placeholder.com/60x60/E9ECEF/868E96.png?text=IMG",
-  },
-  {
-    id: 2,
-    name: "iPhone 11",
-    status: "Solicitado",
-    imageUrl: "https://via.placeholder.com/60x60/E9ECEF/868E96.png?text=IMG",
-  },
-  {
-    id: 3,
-    name: "Tablet Samsung",
-    status: "Entregue",
-    imageUrl: "https://via.placeholder.com/60x60/E9ECEF/868E96.png?text=IMG",
-  },
-];
-
 export function TelaDoador() {
   const navigate = useNavigate();
-  const [donations] = useState(mockDonations);
+  const [dispositivosDoar, setdispositivosDoar] = useState([]);
+  const [solicitacoesRecebidas, setSolicitacoesRecebidas] = useState([]);
 
   const [fileList, setFileList] = useState([]);
   const [registerDevice, setRegisterDevice] = useState({
@@ -63,7 +43,6 @@ export function TelaDoador() {
 
   const { user } = useAuth();
 
-  // Função auxiliar para converter o arquivo em Base64
   const getBase64 = (file) =>
     new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -73,7 +52,6 @@ export function TelaDoador() {
     });
 
   const handleSubmit = async () => {
-    // Validação básica manual
     if (
       !registerDevice.name ||
       !registerDevice.category ||
@@ -84,8 +62,6 @@ export function TelaDoador() {
       return;
     }
 
-    // Converte todas as imagens do fileList para um array de strings Base64
-    console.log({ fileList });
     const base64Images = await Promise.all(
       fileList.map((file) => getBase64(file)),
     );
@@ -100,7 +76,6 @@ export function TelaDoador() {
 
       message.success("Doação cadastrada com sucesso!");
 
-      // Limpando o formulário após sucesso
       setRegisterDevice({
         name: null,
         category: null,
@@ -111,6 +86,21 @@ export function TelaDoador() {
     } catch (error) {
       console.error(error);
       message.error("Falha ao cadastrar a doação.");
+    }
+  };
+
+  const handleUpdateStatus = async (deviceId, status) => {
+    try {
+      await api.put(`/${deviceId}/updateStatus`, {
+        status,
+      });
+      message.success(`Solicitação atualizada com sucesso!`);
+      setSolicitacoesRecebidas((prev) =>
+        prev.filter((req) => req.id_dispositivo !== deviceId),
+      );
+    } catch (error) {
+      console.error(error);
+      message.error("Erro ao atualizar o status da solicitação.");
     }
   };
 
@@ -132,6 +122,7 @@ export function TelaDoador() {
   const getStatusColor = (status) => {
     switch (status) {
       case "Disponível":
+      case "doar":
         return "success";
       case "Solicitado":
         return "warning";
@@ -141,6 +132,45 @@ export function TelaDoador() {
         return "default";
     }
   };
+
+  useEffect(() => {
+    const fetchDevices = async () => {
+      try {
+        const response = await api.get(`/${user.id}/devices`);
+        console.log({ device: response.data });
+        setdispositivosDoar(response.data);
+      } catch (error) {
+        console.error("Erro ao carregar os dispositivos:", error);
+      }
+    };
+
+    const fetchSolicitacoesRecebidas = async () => {
+      try {
+        const response = await api.get(`/${user.id}/user-device-with-request`);
+        console.log(response);
+
+        const flattenedRequests =
+          response.data?.flatMap((device) => {
+            if (!device.solicitacoes) return [];
+            return device.solicitacoes
+              .filter((req) => req.status === "pendente")
+              .map((req) => ({
+                ...req,
+                dispositivo: { nome_dispositivo: device.nome_dispositivo },
+              }));
+          }) || [];
+
+        setSolicitacoesRecebidas(flattenedRequests);
+      } catch (error) {
+        console.error("Erro ao carregar as solicitações:", error);
+      }
+    };
+
+    if (user?.id) {
+      fetchDevices();
+      fetchSolicitacoesRecebidas();
+    }
+  }, [user]);
 
   return (
     <Layout style={{ minHeight: "100vh", backgroundColor: "#f8f9fa" }}>
@@ -320,34 +350,29 @@ export function TelaDoador() {
             </div>
           </Card>
 
-          <Space
-            size="large"
-            style={{ display: "flex", direction: "vertical" }}
-          >
+          <Space direction="vertical" size="large" style={{ display: "flex" }}>
             <Card
               title={
                 <Title level={4} style={{ margin: 0 }}>
                   Minhas Doações
                 </Title>
               }
-              style={{ borderRadius: 8, width: 400 }}
+              style={{ borderRadius: 8, width: "100%", minWidth: 400 }}
             >
               <List
                 itemLayout="horizontal"
-                dataSource={donations}
+                dataSource={dispositivosDoar}
                 renderItem={(donation) => (
-                  <List.Item
-                    actions={[
-                      <a key="details" href="#">
-                        Ver Detalhes
-                      </a>,
-                    ]}
-                  >
+                  <List.Item actions={[]}>
                     <List.Item.Meta
                       avatar={
                         <img
-                          src={donation.imageUrl}
-                          alt={donation.name}
+                          src={
+                            donation.imagens && donation.imagens.length > 0
+                              ? donation.imagens[0].url
+                              : "https://via.placeholder.com/60x60/E9ECEF/868E96.png?text=IMG"
+                          }
+                          alt={donation.nome_dispositivo}
                           style={{
                             width: 50,
                             height: 50,
@@ -358,12 +383,72 @@ export function TelaDoador() {
                         />
                       }
                       title={
-                        <span style={{ fontWeight: 600 }}>{donation.name}</span>
+                        <span style={{ fontWeight: 600 }}>
+                          {donation.nome_dispositivo}
+                        </span>
                       }
                       description={
                         <Tag color={getStatusColor(donation.status)}>
                           {donation.status}
                         </Tag>
+                      }
+                    />
+                  </List.Item>
+                )}
+              />
+            </Card>
+
+            <Card
+              title={
+                <Title level={4} style={{ margin: 0 }}>
+                  Solicitações Recebidas
+                </Title>
+              }
+              style={{ borderRadius: 8, width: "100%", minWidth: 400 }}
+            >
+              <List
+                itemLayout="horizontal"
+                dataSource={solicitacoesRecebidas}
+                renderItem={(req) => (
+                  <List.Item
+                    actions={[
+                      <Button
+                        type="primary"
+                        size="small"
+                        onClick={() =>
+                          handleUpdateStatus(req.id_dispositivo, "aceito")
+                        }
+                      >
+                        Aceitar
+                      </Button>,
+                      <Button
+                        danger
+                        size="small"
+                        onClick={() =>
+                          handleUpdateStatus(req.id_dispositivo, "rejeitado")
+                        }
+                      >
+                        Rejeitar
+                      </Button>,
+                    ]}
+                  >
+                    <List.Item.Meta
+                      title={
+                        <span style={{ fontWeight: 600 }}>
+                          {req.dispositivo?.nome_dispositivo ||
+                            "Dispositivo Solicitado"}
+                        </span>
+                      }
+                      description={
+                        <>
+                          <div>
+                            <strong>Justificativa:</strong>{" "}
+                            {req.justificativa || "Não informada."}
+                          </div>
+                          <div>
+                            <strong>Status:</strong> {req.status || "Pendente"}
+                          </div>
+                        </>
                       }
                     />
                   </List.Item>
