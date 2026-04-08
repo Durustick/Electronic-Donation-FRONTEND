@@ -3,6 +3,7 @@
 import { Container, Content } from "./styles";
 import { useState } from "react";
 import { useAuth } from "../../hooks/useAuth";
+import { useNavigate } from "react-router-dom";
 import {
   Typography,
   Form,
@@ -18,12 +19,14 @@ import {
   Statistic,
   Space,
   message,
+  Layout,
 } from "antd";
-import { InboxOutlined } from "@ant-design/icons";
+import { InboxOutlined, ArrowLeftOutlined } from "@ant-design/icons";
 import { api } from "../../services/api";
 
 const { Title, Paragraph } = Typography;
 const { Dragger } = Upload;
+const { Header } = Layout;
 
 const mockDonations = [
   {
@@ -47,6 +50,7 @@ const mockDonations = [
 ];
 
 export function TelaDoador() {
+  const navigate = useNavigate();
   const [donations] = useState(mockDonations);
 
   const [fileList, setFileList] = useState([]);
@@ -92,7 +96,7 @@ export function TelaDoador() {
     };
 
     try {
-      const response = await api.post(`/${user.id}/device/register`, payload);
+      await api.post(`/${user.id}/device/register`, payload);
 
       message.success("Doação cadastrada com sucesso!");
 
@@ -139,7 +143,28 @@ export function TelaDoador() {
   };
 
   return (
-    <>
+    <Layout style={{ minHeight: "100vh", backgroundColor: "#f8f9fa" }}>
+      <Header
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          backgroundColor: "white",
+          padding: "0 50px",
+          borderBottom: "1px solid #f0f0f0",
+        }}
+      >
+        <Title level={3} style={{ color: "#1890ff", margin: 0 }}>
+          Electronic Donation
+        </Title>
+        <Button
+          icon={<ArrowLeftOutlined />}
+          onClick={() => navigate("/")}
+          style={{ border: 0, boxShadow: "none" }}
+        >
+          Voltar para Home
+        </Button>
+      </Header>
       <Container>
         <Title level={2} style={{ color: "#343a40", margin: 0 }}>
           Área do Doador
@@ -348,7 +373,6 @@ export function TelaDoador() {
           </Space>
         </Content>
       </Container>
-      {/* <Footer /> */}
-    </>
+    </Layout>
   );
 }
